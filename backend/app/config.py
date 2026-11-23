@@ -12,7 +12,7 @@ class Settings(BaseSettings):
     database_url: str = "sqlite:///./sentinelai.db"
 
     groq_api_key: str = ""
-    groq_model: str = "llama-3.3-70b-versatile"
+    groq_model: str = "openai/gpt-oss-120b"
 
     poll_interval_seconds: float = 2.0
     cpu_warning_threshold: float = 75.0
