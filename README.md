@@ -1,35 +1,91 @@
 # SentinelAI
-
-SentinelAI is a cross-platform server health monitoring and controlled remediation application built with FastAPI, React, LangGraph, Groq, `psutil`, and SQLite.
-
-It monitors local Windows and Ubuntu Linux systems while a dashboard session is active, detects threshold-based resource anomalies, investigates root causes using a tool-calling AI agent, and executes allowlisted remediation actions only after explicit user approval and post-action verification.
-
+ 
+**Intelligent Monitoring. Controlled Remediation. Verified Outcomes.**
+ 
+SentinelAI is a cross-platform server health monitoring application with an AI agent that investigates problems and proposes fixes. It watches a local Windows or Ubuntu Linux machine, detects resource anomalies, uses a tool-calling LLM agent to find the likely root cause, and runs a fix only after a human approves it. After every fix, it re-measures the system to confirm whether the problem was actually resolved.
+ 
+Built with FastAPI, React, LangGraph, Groq, `psutil`, and SQLite.
+ 
+![Dashboard overview](![alt text](image.png))
+ 
 ---
-
+ 
+## Table of Contents
+ 
+- [Key Features](#key-features)
+- [How It Works](#how-it-works)
+- [Architecture](#architecture)
+- [Technology Stack](#technology-stack)
+- [Security and Safety Controls](#security-and-safety-controls)
+- [Getting Started](#getting-started)
+- [Usage Walkthrough](#usage-walkthrough)
+- [Testing and Demo](#testing-and-demo)
+- [API Reference](#api-reference)
+- [Limitations and Future Work](#limitations-and-future-work)
+- [Security Notes](#security-notes)
+- [License](#license)
+---
+ 
+## Key Features
+ 
+- **Live monitoring:** CPU, RAM, swap, disk, uptime, and per-process metrics streamed to a React dashboard over WebSockets.
+- **Threshold-based anomaly detection:** Configurable warning and critical thresholds, with cooldown to avoid alert spam, automatic escalation from `WARNING` to `CRITICAL`, and automatic recovery reset.
+- **AI root-cause investigation:** A LangGraph agent calls 7 read-only diagnostic tools and produces a report that separates confirmed observations from suspected causes.
+- **Human-in-the-loop remediation:** The agent can only propose actions from a fixed allowlist. Nothing runs until a user approves it.
+- **Verified outcomes:** Each executed action is followed by a fresh metric check, so the audit log records whether the issue was really fixed.
+- **Full audit trail:** Anomalies, reports, proposals, decisions, safety checks, and verification results are all stored in SQLite.
+- **Cross-platform:** Works on Windows 11 and Ubuntu Linux through OS-specific adapters.
+---
+ 
+## How It Works
+ 
+![Agent workflow]![alt text](image-1.png)
+ 
+```mermaid
+flowchart TD
+    A[Dashboard connects via WebSocket] --> B[Monitoring engine polls psutil]
+    B --> C{Threshold exceeded?}
+    C -- No --> B
+    C -- Yes --> D[Anomaly saved and shown as alert]
+    D --> E[User clicks Investigate]
+    E --> F[LangGraph agent loop<br/>calls read-only diagnostic tools]
+    F --> G[Synthesis node writes report<br/>confirmed observations vs suspected causes]
+    G --> H[Structured RemediationProposal<br/>allowlisted action only]
+    H --> I{User decision}
+    I -- Reject --> J[Rejection logged]
+    I -- Approve --> K[Safety guards<br/>blocklist, PID check, allowlist]
+    K -- Blocked --> J
+    K -- Passed --> L[Capture pre-action metrics]
+    L --> M[Execute handler]
+    M --> N[Wait, then re-sample metrics]
+    N --> O{Issue resolved?}
+    O -- Yes --> P[VERIFIED_RESOLVED]
+    O -- No --> Q[EXECUTED_UNRESOLVED]
+```
+ 
+1. **Detect.** While a dashboard session is open, the backend collects metrics and compares them to thresholds.
+2. **Investigate.** On user request, the agent runs a bounded loop of read-only tool calls (for example, inspecting top processes and resource usage) to gather evidence.
+3. **Report.** A synthesis step writes a structured report. Facts returned by tools are kept separate from the agent's hypotheses.
+4. **Propose.** The agent outputs a typed `RemediationProposal`. It cannot produce free-form commands.
+5. **Approve.** The proposal stays `PENDING` in the database until a user approves or rejects it.
+6. **Execute and verify.** Safety guards run, the action executes, and the system is re-measured to record the real outcome.
+---
+ 
 ## Architecture
-
-SentinelAI follows a modular monolith architecture with strict separation between telemetry collection, anomaly evaluation, AI investigation, safety-guarded remediation, persistence, and presentation.
-
-- **Monitoring Engine (`backend/app/monitoring/`)**: Collects CPU, RAM, swap, disk, OS metadata, uptime, and process metrics via `psutil`, isolating OS-specific mount filtering and protected process lists inside `WindowsAdapter` and `LinuxAdapter`.
-- **Anomaly Detection Engine (`backend/app/anomalies/`)**: Evaluates snapshots against configurable warning/critical thresholds with per-key cooldown suppression, immediate `WARNING` to `CRITICAL` escalation, and automatic recovery resets.
-- **LangGraph AI Agent (`backend/app/agent/`)**: Runs a bounded ReAct-style tool-calling loop on Groq using 7 read-only diagnostic tools, followed by a structured synthesis node that separates confirmed tool observations from suspected causes.
-- **Controlled Remediation Engine (`backend/app/remediation/`)**: Enforces human-in-the-loop approval, allowlist-only dispatch, OS protected-process blocklists, PID reuse verification, and pre/post metric verification.
-- **FastAPI & SQLite Layer (`backend/app/api/`, `backend/app/db/`)**: Exposes REST endpoints and a session-scoped WebSocket stream (`/ws/metrics`) that starts polling when a dashboard connects and stops cleanly when all clients disconnect.
-- **React Dashboard (`frontend/src/`)**: TypeScript + Vite single-page interface providing live Recharts telemetry graphs, process inspection, threshold configuration, investigation reports, remediation approval controls, and an incident audit log.
-
-## Technology Stack
-
-| Layer | Technology |
-| :--- | :--- |
-| Frontend | React, TypeScript, Vite, Recharts |
-| Backend | Python 3.12, FastAPI, Uvicorn |
-| AI Agent | LangGraph, LangChain Core, Groq API |
-| System Telemetry | `psutil` with Windows and Linux OS adapters |
-| Database | SQLite with SQLAlchemy 2.0 ORM |
-| Testing | `pytest`, FastAPI `TestClient` |
-
-## Directory Structure
-
+ 
+SentinelAI is a **modular monolith**: one deployable backend with strict boundaries between telemetry, detection, AI investigation, remediation, persistence, and presentation.
+ 
+| Module | Path | Responsibility |
+| :--- | :--- | :--- |
+| Monitoring Engine | `backend/app/monitoring/` | Collects CPU, RAM, swap, disk, OS metadata, uptime, and process metrics via `psutil`. OS-specific mount filtering and protected-process lists live in `WindowsAdapter` and `LinuxAdapter`. |
+| Anomaly Detection | `backend/app/anomalies/` | Evaluates snapshots against warning/critical thresholds with per-key cooldown, immediate escalation, and recovery resets. |
+| AI Agent | `backend/app/agent/` | LangGraph ReAct-style tool-calling loop on Groq with 7 read-only tools, followed by a structured synthesis node. Also holds prompts and report schemas. |
+| Remediation Engine | `backend/app/remediation/` | Allowlist registry, safety guards, action handlers, and the pre/post metric verifier. |
+| API and Database | `backend/app/api/`, `backend/app/db/` | REST endpoints, session-scoped WebSocket manager, SQLAlchemy models, and repository layer. |
+| Dashboard | `frontend/src/` | React + TypeScript SPA with live charts, process table, alerts, investigation reports, approval modal, and incident history. |
+ 
+<details>
+<summary>Full directory structure</summary>
 ```text
 sentinelai/
 ├── backend/
@@ -56,59 +112,80 @@ sentinelai/
         ├── styles/         # Dashboard stylesheet
         └── types/          # Shared TypeScript API and telemetry interfaces
 ```
-
+ 
+</details>
+### Design decisions
+ 
+- **Why threshold-based detection instead of ML?** Thresholds are predictable, explainable, and produce few false positives. The AI is used where it adds the most value: explaining *why* something is happening, not deciding *whether* something is wrong.
+- **Why a modular monolith?** SentinelAI monitors a single host. One process with clear module boundaries is simpler to run, test, and demo than microservices.
+- **Why session-scoped monitoring?** Polling starts when a dashboard connects and stops when the last client disconnects, so the tool uses no resources when nobody is watching.
 ---
-
+ 
+## Technology Stack
+ 
+| Layer | Technology |
+| :--- | :--- |
+| Frontend | React, TypeScript, Vite, Recharts |
+| Backend | Python 3.12, FastAPI, Uvicorn |
+| AI Agent | LangGraph, LangChain Core, Groq API |
+| System Telemetry | `psutil` with Windows and Linux OS adapters |
+| Database | SQLite with SQLAlchemy 2.0 ORM |
+| Communication | REST and WebSockets |
+| Testing | `pytest`, FastAPI `TestClient` |
+ 
+---
+ 
 ## Security and Safety Controls
-
-### 1. No Arbitrary Shell Execution
-
-The LLM outputs a structured `RemediationProposal` restricted to an enum allowlist:
-
+ 
+An agent that can act on a real machine needs strict limits. SentinelAI applies five layers of protection.
+ 
+### 1. No arbitrary shell execution
+ 
+The LLM never produces commands. It outputs a structured `RemediationProposal` whose action is restricted to an enum:
+ 
 - `terminate_process`
 - `restart_managed_service`
 - `clear_temp_directory`
 - `none`
-
-### 2. Explicit User Authorization
-
-Proposed actions remain in `PENDING` state in SQLite until approved via:
-
-`POST /api/remediation/{id}/decide`
-
-### 3. OS Protected Process Blocklists
-
-Critical Windows processes (`System`, `csrss.exe`, `wininit.exe`, `lsass.exe`, `svchost.exe`, etc.) and Linux processes (`systemd`, `init`, `sshd`, `dbus-daemon`, `dockerd`, etc.) are blocked even if an approved request targets them.
-
-### 4. PID Reuse Protection
-
-Process termination verifies that the live OS process name at `target_pid` still matches the `target_name` observed during investigation.
-
-### 5. Verified Outcomes Only
-
+### 2. Explicit user authorization
+ 
+Proposed actions stay in `PENDING` state in SQLite until a user approves them via `POST /api/remediation/{id}/decide`.
+ 
+### 3. OS protected-process blocklists
+ 
+Critical processes are blocked even if an approved request targets them.
+ 
+- **Windows:** `System`, `csrss.exe`, `wininit.exe`, `lsass.exe`, `svchost.exe`, and others.
+- **Linux:** `systemd`, `init`, `sshd`, `dbus-daemon`, `dockerd`, and others.
+### 4. PID reuse protection
+ 
+Before terminating a process, the live OS process name at `target_pid` is compared with the `target_name` recorded during investigation. If they differ, the action is refused. This guards against acting on a different process that reused the same PID.
+ 
+### 5. Verified outcomes only
+ 
 Every executed action:
-
+ 
 1. Captures pre-action metrics.
 2. Waits for OS counters to settle.
 3. Re-samples live metrics.
-4. Records whether the issue is verified resolved (`VERIFIED_RESOLVED`) or unresolved (`EXECUTED_UNRESOLVED`).
-
+4. Records `VERIFIED_RESOLVED` or `EXECUTED_UNRESOLVED`.
+SentinelAI never assumes a fix worked.
+ 
 ---
-
-## Local Setup
-
+ 
+## Getting Started
+ 
 ### Prerequisites
-
+ 
 - Python 3.12
 - Node.js and npm
 - Git
-- Groq API key
+- A [Groq API key](https://console.groq.com/)
 - Windows 11 or Ubuntu Linux
-
-### 1. Backend Setup
-
-#### Windows (PowerShell)
-
+### 1. Backend setup
+ 
+**Windows (PowerShell)**
+ 
 ```powershell
 cd backend
 python -m venv venv
@@ -116,9 +193,9 @@ python -m venv venv
 pip install -r requirements.txt
 Copy-Item .env.example .env
 ```
-
-#### Ubuntu Linux (Bash)
-
+ 
+**Ubuntu Linux (Bash)**
+ 
 ```bash
 cd backend
 python3 -m venv .venv-linux
@@ -126,160 +203,108 @@ source .venv-linux/bin/activate
 pip install -r requirements.txt
 cp .env.example .env
 ```
-
-### Configure Environment Variables
-
-Edit `backend/.env` and configure your Groq API key:
-
+ 
+Edit `backend/.env` and add your Groq key:
+ 
 ```env
 GROQ_API_KEY=your_actual_groq_api_key
 GROQ_MODEL=openai/gpt-oss-120b
 ```
-
-### 2. Frontend Setup
-
-Open a second terminal from the project root:
-
+ 
+> Model availability on Groq changes over time. If the default model is unavailable on your account, set `GROQ_MODEL` to any tool-calling model that Groq currently offers.
+ 
+### 2. Frontend setup
+ 
+From the project root:
+ 
 ```bash
 cd frontend
 npm install
 ```
-
----
-
-## Running the Project
-
-SentinelAI requires two independently running services: the FastAPI backend and the React frontend.
-
-### Step 1: Start the Backend
-
-Open a terminal, navigate to `backend/`, activate your virtual environment, and execute:
-
+ 
+### 3. Run the application
+ 
+SentinelAI runs as two services, each in its own terminal.
+ 
+**Terminal 1: backend** (from `backend/`, virtual environment active)
+ 
 ```bash
 uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
 ```
-
-The backend will be available at:
-
-- **API Base URL:** `http://127.0.0.1:8000`
-- **Interactive API Documentation:** `http://127.0.0.1:8000/docs`
-
-### Step 2: Start the Frontend
-
-Open another terminal, navigate to `frontend/`, and execute:
-
+ 
+- API base URL: `http://127.0.0.1:8000`
+- Interactive API docs: `http://127.0.0.1:8000/docs`
+**Terminal 2: frontend** (from `frontend/`)
+ 
 ```bash
 npm run dev
 ```
-
-The frontend will be available at:
-
-`http://localhost:5173`
-
-### Step 3: Open the Dashboard
-
-Open `http://localhost:5173` in your browser.
-
-Once the dashboard connects to the backend through its WebSocket session:
-
-- Live system monitoring begins.
-- CPU, RAM, swap, and disk metrics are collected.
-- Running processes are displayed.
-- Resource utilization is visualized through live charts.
-- Threshold-based anomaly detection becomes active.
-
-Monitoring automatically stops when all dashboard clients disconnect.
-
-### Step 4: Monitor System Resources
-
-Navigate through the dashboard to inspect:
-
-- System overview and resource utilization.
-- CPU and memory usage graphs.
-- Disk and swap utilization.
-- Running processes and their resource consumption.
-- Protected OS processes.
-- Active alerts and historical incidents.
-
-### Step 5: Trigger an AI Investigation
-
-When an anomaly is detected:
-
-1. Navigate to **Alerts & AI Agent**.
-2. Select the relevant alert.
-3. Click **Investigate**.
-4. Allow the LangGraph agent to execute its read-only diagnostic tools.
-5. Review the generated investigation report.
-
-The report separates confirmed system observations from suspected root causes.
-
-### Step 6: Execute Controlled Remediation
-
-If the AI agent proposes a remediation action:
-
-1. Review the proposed action.
-2. Inspect the target process and risk level.
-3. Review the remediation rationale.
-4. Click **Approve & Execute** to authorize the action.
-5. Allow the remediation engine to execute its safety checks.
-6. Review the post-action verification results.
-
-The system records whether the action successfully resolved the detected issue.
-
-### Step 7: Review Incident History
-
-Navigate to **Incident History** to inspect persisted records containing:
-
-- Original anomaly details.
-- AI investigation reports.
-- Proposed remediation actions.
-- User approval or rejection decisions.
-- Safety guard results.
-- Post-action verification metrics.
-
+ 
+Then open **http://localhost:5173** in your browser.
+ 
 ---
-
-## Testing
-
-### Run Automated Tests
-
-From the `backend/` directory with your virtual environment activated:
-
+ 
+## Usage Walkthrough
+ 
+### Monitor
+ 
+Once the dashboard connects, live monitoring begins automatically. You can inspect system overview, CPU and memory graphs, disk and swap usage, running processes, protected OS processes, and active alerts. Monitoring stops when all dashboard clients disconnect.
+ 
+![Live monitoring]![alt text](image-2.png)
+ 
+### Investigate
+ 
+1. Open **Alerts & AI Agent**.
+2. Select an alert.
+3. Click **Investigate**.
+4. Wait for the agent to run its diagnostic tools.
+5. Read the report, which separates confirmed observations from suspected root causes.
+### Remediate
+ 
+If the agent proposes an action:
+ 
+1. Review the action, target process, risk level, and rationale.
+2. Click **Approve & Execute** (or reject it).
+3. The remediation engine runs its safety checks and executes the action.
+4. Review the post-action verification result.
+![Remediation approval]![alt text](image-3.png)
+ 
+### Review history
+ 
+Open **Incident History** to see the full audit trail: original anomaly, AI report, proposed action, your decision, safety guard results, and before/after metrics.
+ 
+---
+ 
+## Testing and Demo
+ 
+### Run the test suite
+ 
+From `backend/` with the virtual environment active:
+ 
 ```bash
 pytest -v
 ```
-
-The test suite covers:
-
-- Unit testing.
-- Anomaly detection.
-- Security and remediation safeguards.
-- Cross-platform monitoring.
-- API integration.
-- FastAPI endpoint behavior.
-
-### Simulate CPU Usage
-
-To generate a controlled CPU spike:
-
+ 
+The suite covers anomaly detection, remediation and security safeguards, cross-platform monitoring, and API integration.
+ 
+### Generate a demo anomaly
+ 
+Use the load simulator to trigger real alerts:
+ 
 ```bash
+# CPU spike for 45 seconds
 python scripts/load_simulator.py --mode cpu --duration 45
-```
-
-### Simulate Memory Usage
-
-To generate a controlled memory spike:
-
-```bash
+ 
+# Memory spike for 45 seconds
 python scripts/load_simulator.py --mode memory --duration 45
 ```
-
-These simulations can be used to test threshold-based anomaly detection and AI investigation workflows.
-
+ 
+**Suggested demo flow:** start both services, open the dashboard, run the CPU simulator, wait for the alert, click **Investigate**, approve the proposed action, and show the `VERIFIED_RESOLVED` result in Incident History.
+ 
 ---
-
-## Core API Endpoints
-
+ 
+## API Reference
+ 
 | Method | Endpoint | Purpose |
 | :--- | :--- | :--- |
 | GET | `/health` | Service status and host OS metadata |
@@ -287,81 +312,39 @@ These simulations can be used to test threshold-based anomaly detection and AI i
 | GET | `/api/metrics/snapshot` | On-demand point-in-time system snapshot |
 | GET / PUT | `/api/metrics/thresholds` | View or update anomaly detection thresholds |
 | GET | `/api/alerts` | Retrieve persisted anomaly records |
-| POST | `/api/agent/investigate` | Trigger a LangGraph AI investigation by anomaly ID or prompt |
-| GET | `/api/remediation/pending` | List remediation actions awaiting user approval |
+| POST | `/api/agent/investigate` | Trigger an AI investigation by anomaly ID or prompt |
+| GET | `/api/remediation/pending` | List remediation actions awaiting approval |
 | POST | `/api/remediation/{id}/decide` | Approve or reject a proposed remediation action |
-| GET | `/api/incidents` | Retrieve full incident, report, and remediation audit history |
-
+| GET | `/api/incidents` | Full incident, report, and remediation audit history |
+ 
 ---
-
-## Final Verification and Git Commit
-
-### 1. Confirm Repository Status
-
-Run from the `sentinelai/` project root:
-
-```powershell
-git status
-```
-
-Verify that the following files and directories are ignored by Git:
-
-- `.env`
-- `*.db`
-- `venv/`
-- `.venv-linux/`
-- `backend/runtime/`
-- `frontend/node_modules/`
-
-### 2. Run Backend Tests
-
-```powershell
-cd backend
-pytest -v
-```
-
-### 3. Build the Frontend
-
-```powershell
-cd ..\frontend
-npm run build
-```
-
-### 4. Return to Project Root
-
-```powershell
-cd ..
-```
-
-### 5. Commit the Project to Git
-
-Stage all project files:
-
-```powershell
-git add .
-```
-
-Commit the changes:
-
-```powershell
-git commit -m "feat: complete SentinelAI monitoring, LangGraph agent, guarded remediation, dashboard, and docs"
-```
-
+ 
+## Limitations and Future Work
+ 
+SentinelAI is designed as a focused, single-host tool. Known limitations:
+ 
+- **Single machine only.** It monitors the host it runs on, not a fleet of servers.
+- **Threshold-based detection.** It does not learn baselines or detect subtle or gradual anomalies.
+- **External LLM dependency.** Investigations require network access to the Groq API and are subject to its availability and rate limits.
+- **LLM output is not guaranteed correct.** Reports can contain wrong hypotheses. This is why suspected causes are labeled separately and every action needs human approval.
+- **Limited remediation scope.** Only the four allowlisted actions are supported.
+- **SQLite storage.** Suitable for one host and moderate history, not for large-scale or multi-user deployments.
+- **Local use.** The app has no authentication layer and is intended to run on localhost.
+Possible future improvements:
+ 
+- Multi-host monitoring with lightweight agents
+- Adaptive or ML-based baseline anomaly detection
+- User authentication and role-based approval
+- Support for local or self-hosted LLMs
+- PostgreSQL for larger deployments
+- Notifications through email or chat
 ---
-
-## Project Summary
-
-| Component | Implementation |
-| :--- | :--- |
-| Project Name | SentinelAI |
-| Architecture | Modular Monolith |
-| Frontend | React, TypeScript, Vite |
-| Backend | Python, FastAPI |
-| AI Agent | LangGraph, LangChain Core, Groq |
-| System Monitoring | psutil |
-| Database | SQLite, SQLAlchemy |
-| Operating Systems | Windows and Ubuntu Linux |
-| Testing | pytest, FastAPI TestClient |
-| Communication | REST API and WebSockets |
-
-**SentinelAI — Intelligent Monitoring. Controlled Remediation. Verified Outcomes.**
+ 
+## Security Notes
+ 
+- **Never commit your `.env` file or API key.** Make sure the following are ignored by Git: `.env`, `*.db`, `venv/`, `.venv-linux/`, `backend/runtime/`, `frontend/node_modules/`.
+- Run the backend on `127.0.0.1` only. Do not expose it to a public network, since it can terminate processes on the host.
+- Test remediation on a development machine first.
+---
+ 
+ 
