@@ -6,7 +6,7 @@ SentinelAI is a cross-platform server health monitoring application with an AI a
  
 Built with FastAPI, React, LangGraph, Groq, `psutil`, and SQLite.
  
-![Dashboard overview](![alt text](image.png))
+Dashboard overview: ![alt text](image.png)
  
 ---
  
@@ -39,7 +39,7 @@ Built with FastAPI, React, LangGraph, Groq, `psutil`, and SQLite.
  
 ## How It Works
  
-![Agent workflow]![alt text](image-1.png)
+Agent workflow: ![alt text](image-1.png)
  
 ```mermaid
 flowchart TD
@@ -250,7 +250,7 @@ Then open **http://localhost:5173** in your browser.
  
 Once the dashboard connects, live monitoring begins automatically. You can inspect system overview, CPU and memory graphs, disk and swap usage, running processes, protected OS processes, and active alerts. Monitoring stops when all dashboard clients disconnect.
  
-![Live monitoring]![alt text](image-2.png)
+Live monitoring: ![alt text](image-2.png)
  
 ### Investigate
  
@@ -267,7 +267,7 @@ If the agent proposes an action:
 2. Click **Approve & Execute** (or reject it).
 3. The remediation engine runs its safety checks and executes the action.
 4. Review the post-action verification result.
-![Remediation approval]![alt text](image-3.png)
+Remediation approval: ![alt text](image-3.png)
  
 ### Review history
  
