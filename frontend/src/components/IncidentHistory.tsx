@@ -55,7 +55,7 @@ export function IncidentHistory({ incidents, onRefresh }: IncidentHistoryProps) 
                     </span>
                   </div>
                   <span style={{ fontSize: "0.78rem", color: "#6b7280" }}>
-                    {new Date(inc.created_at).toLocaleString()}
+                    formatIstDateTime(inc.created_at)
                   </span>
                 </div>
 

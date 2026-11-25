@@ -1,6 +1,6 @@
 import platform
 from contextlib import asynccontextmanager
-from datetime import datetime, timezone
+from app.time_utils import now_ist
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -52,5 +52,5 @@ def health_check() -> dict:
         "environment": settings.app_env,
         "os": platform.system(),
         "os_release": platform.release(),
-        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "timestamp": now_ist().isoformat(),
     }

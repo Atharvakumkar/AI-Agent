@@ -6,6 +6,7 @@ import type {
   MetricsStreamMessage,
   SystemSnapshot,
 } from "../types/sentinel";
+import { formatIstTime } from "./time";
 
 export type ConnectionStatus = "connecting" | "connected" | "paused" | "error";
 
@@ -69,7 +70,7 @@ export function useMetricsStream(onNewAnomalies?: (items: AnomalyItem[]) => void
           setSnapshot(msg.snapshot);
 
           const point: ChartPoint = {
-            time: formatTimeLabel(msg.snapshot.timestamp),
+            time: formatIstTime(msg.snapshot.timestamp),
             cpu: msg.snapshot.cpu.usage_percent,
             memory: msg.snapshot.memory.usage_percent,
             disk: msg.snapshot.disk.usage_percent,

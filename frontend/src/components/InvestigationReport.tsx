@@ -45,7 +45,7 @@ export function InvestigationReport({
           >
             {reports.map((rep, idx) => (
               <option key={rep.id} value={idx}>
-                Incident #{rep.incident_id} · {new Date(rep.created_at).toLocaleTimeString()}
+                Incident #{rep.incident_id} · formatIstTime(rep.created_at)
               </option>
             ))}
           </select>
@@ -93,7 +93,7 @@ export function InvestigationReport({
               <strong>Incident #{activeReport.incident_id}</strong>
             </div>
             <span style={{ fontSize: "0.78rem", color: "#6b7280" }}>
-              {new Date(activeReport.created_at).toLocaleString()}
+              formatIstDateTime(activeReport.created_at)
             </span>
           </div>
 

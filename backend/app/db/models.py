@@ -1,19 +1,18 @@
-from datetime import datetime, timezone
+from datetime import datetime
+from app.time_utils import now_ist
+
 from sqlalchemy import Boolean, DateTime, Float, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.database import Base
 
 
-def _utcnow() -> datetime:
-    return datetime.now(timezone.utc)
-
 
 class MonitoringSession(Base):
     __tablename__ = "monitoring_sessions"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
+    started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now_ist)
     ended_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     hostname: Mapped[str] = mapped_column(String(128))
     os_name: Mapped[str] = mapped_column(String(64))
@@ -28,7 +27,7 @@ class MetricSnapshotRecord(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     session_id: Mapped[int | None] = mapped_column(ForeignKey("monitoring_sessions.id"), nullable=True)
-    timestamp: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
+    timestamp: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now_ist)
     cpu_percent: Mapped[float] = mapped_column(Float)
     memory_percent: Mapped[float] = mapped_column(Float)
     available_memory_gb: Mapped[float] = mapped_column(Float)
@@ -45,7 +44,7 @@ class AnomalyRecord(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     session_id: Mapped[int | None] = mapped_column(ForeignKey("monitoring_sessions.id"), nullable=True)
-    timestamp: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
+    timestamp: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now_ist)
     category: Mapped[str] = mapped_column(String(32))
     severity: Mapped[str] = mapped_column(String(16))
     metric_name: Mapped[str] = mapped_column(String(64))
@@ -64,7 +63,7 @@ class IncidentRecord(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     anomaly_id: Mapped[int | None] = mapped_column(ForeignKey("anomalies.id"), nullable=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now_ist)
     trigger_summary: Mapped[str] = mapped_column(Text)
     severity: Mapped[str] = mapped_column(String(16))
     status: Mapped[str] = mapped_column(String(32), default="INVESTIGATED")
@@ -78,7 +77,7 @@ class InvestigationReportRecord(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     incident_id: Mapped[int] = mapped_column(ForeignKey("incidents.id"))
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now_ist)
     summary: Mapped[str] = mapped_column(Text)
     severity: Mapped[str] = mapped_column(String(16))
     confirmed_observations_json: Mapped[str] = mapped_column(Text)
@@ -94,7 +93,7 @@ class RemediationActionRecord(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     incident_id: Mapped[int] = mapped_column(ForeignKey("incidents.id"))
     report_id: Mapped[int] = mapped_column(ForeignKey("investigation_reports.id"))
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now_ist)
 
     action_type: Mapped[str] = mapped_column(String(64))
     target_pid: Mapped[int | None] = mapped_column(Integer, nullable=True)

@@ -1,6 +1,6 @@
 import json
 import os
-from datetime import datetime, timezone
+from app.time_utils import now_ist
 from pathlib import Path
 import psutil
 
@@ -74,7 +74,7 @@ def execute_restart_managed_service(service_name: str) -> ActionExecutionResult:
         "service_name": service_name,
         "status": "running",
         "restart_count": previous_restarts + 1,
-        "last_restarted_at": datetime.now(timezone.utc).isoformat(),
+        "last_restarted_at": now_ist().isoformat(),
         "host_pid": os.getpid(),
     }
     try:

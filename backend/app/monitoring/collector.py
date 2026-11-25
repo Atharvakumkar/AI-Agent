@@ -1,7 +1,8 @@
 import platform
 import socket
 import time
-from datetime import datetime, timezone
+from datetime import datetime
+from app.time_utils import from_timestamp_ist, now_ist
 import psutil
 
 from app.monitoring.linux_adapter import LinuxAdapter
@@ -66,7 +67,7 @@ class SystemMonitor:
 
     def get_system_information(self) -> SystemInfo:
         boot_ts = psutil.boot_time()
-        boot_dt = datetime.fromtimestamp(boot_ts, tz=timezone.utc)
+        boot_dt = from_timestamp_ist(boot_ts)
         uptime_seconds = max(0, int(time.time() - boot_ts))
 
         return SystemInfo(
@@ -206,7 +207,7 @@ class SystemMonitor:
                 norm_cpu = round(min(raw_cpu / logical_cores, 100.0), 1)
                 mem_info = proc.memory_info()
                 mem_pct = round(proc.memory_percent(), 2)
-                create_dt = datetime.fromtimestamp(proc.create_time(), tz=timezone.utc)
+                create_dt = from_timestamp_ist(proc.create_time())
                 parent_pid = proc.ppid()
                 num_threads = proc.num_threads()
 
@@ -244,7 +245,7 @@ class SystemMonitor:
 
     def collect_snapshot(self, top_n: int = 10) -> SystemSnapshot:
         return SystemSnapshot(
-            timestamp=datetime.now(timezone.utc),
+            timestamp=now_ist(),
             system_info=self.get_system_information(),
             cpu=self.get_cpu_metrics(interval=None),
             memory=self.get_memory_metrics(),

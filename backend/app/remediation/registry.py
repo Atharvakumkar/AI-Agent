@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from app.time_utils import now_ist
 
 from app.agent.schemas import RemediationActionType, RemediationProposal
 from app.monitoring.collector import SystemMonitor
@@ -32,7 +32,7 @@ class RemediationEngine:
         proposal: RemediationProposal,
         approved: bool,
     ) -> RemediationOutcome:
-        now = datetime.now(timezone.utc)
+        now = now_ist()
 
         # 1. Explicit human approval gate
         if not approved:
@@ -108,7 +108,7 @@ class RemediationEngine:
             guard_check=guard_result,
             execution=execution,
             verification=verification,
-            executed_at=datetime.now(timezone.utc),
+            executed_at=now_ist(),
         )
 
     def _run_guard(self, proposal: RemediationProposal) -> GuardCheckResult:

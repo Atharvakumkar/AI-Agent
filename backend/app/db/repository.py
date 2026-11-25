@@ -1,5 +1,5 @@
 import json
-from datetime import datetime, timezone
+from app.time_utils import ensure_ist, now_ist
 from typing import Any
 from sqlalchemy import desc, select
 from sqlalchemy.orm import Session
@@ -31,7 +31,7 @@ def close_session(db: Session, session_id: int) -> None:
     session = db.get(MonitoringSession, session_id)
     if session and session.status == "ACTIVE":
         session.status = "CLOSED"
-        session.ended_at = datetime.now(timezone.utc)
+        session.ended_at = now_ist()
         db.commit()
 
 
@@ -209,7 +209,7 @@ def apply_remediation_outcome(
 ) -> RemediationActionRecord:
     record.status = outcome.status.value
     record.approved_by_user = outcome.approved_by_user
-    record.decision_at = datetime.now(timezone.utc)
+    record.decision_at = now_ist()
     record.guard_allowed = outcome.guard_check.allowed
     record.guard_reason = outcome.guard_check.reason
     record.executed_at = outcome.executed_at
