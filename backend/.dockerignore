@@ -11,3 +11,8 @@ __pycache__/
 .env
 *.db
 .git/
+*.log
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
