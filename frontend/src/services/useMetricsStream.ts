@@ -12,15 +12,6 @@ export type ConnectionStatus = "connecting" | "connected" | "paused" | "error";
 
 const MAX_HISTORY_POINTS = 40;
 
-function formatTimeLabel(iso: string): string {
-  const date = new Date(iso);
-  return date.toLocaleTimeString([], {
-    hour: "2-digit",
-    minute: "2-digit",
-    second: "2-digit",
-  });
-}
-
 export function useMetricsStream(onNewAnomalies?: (items: AnomalyItem[]) => void) {
   const [status, setStatus] = useState<ConnectionStatus>("connecting");
   const [sessionId, setSessionId] = useState<number | null>(null);
