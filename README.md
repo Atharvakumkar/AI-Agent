@@ -332,12 +332,10 @@ SentinelAI is designed as a focused, single-host tool. Known limitations:
 - **Local use.** The app has no authentication layer and is intended to run on localhost.
 Possible future improvements:
  
-- Multi-host monitoring with lightweight agents
 - Adaptive or ML-based baseline anomaly detection
 - User authentication and role-based approval
 - Support for local or self-hosted LLMs
 - PostgreSQL for larger deployments
-- Notifications through email or chat
 ---
  
 ## Security Notes
